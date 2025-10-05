@@ -2,8 +2,9 @@
 <html lang="vi">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <title>Trung Thu</title>
+  <link rel="preconnect" href="https://raw.githubusercontent.com" />
   <style>
     :root {
       --accent: #ff7f50;
@@ -13,9 +14,10 @@
     html, body {
       height: 100%;
       margin: 0;
-      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      font-family: system-ui, sans-serif;
       background: #060614;
       overflow: hidden;
+      touch-action: manipulation; /* Tối ưu touch trên mobile */
     }
 
     .stage {
@@ -28,6 +30,7 @@
       display: block;
       width: 100%;
       height: 100%;
+      will-change: transform; /* Tối ưu rendering */
     }
 
     .moon {
@@ -52,6 +55,7 @@
       pointer-events: none;
       overflow: hidden;
       z-index: 10;
+      contain: layout style paint; /* Tối ưu containment cho perf */
     }
 
     .lantern {
@@ -59,6 +63,8 @@
       pointer-events: auto;
       width: 40px;
       user-select: none;
+      will-change: transform, opacity; /* Tối ưu animation */
+      image-rendering: -webkit-optimize-contrast; /* Tối ưu hình ảnh trên mobile */
     }
 
     @keyframes swing {
@@ -123,11 +129,18 @@
       margin-left: 8px;
       color: #fff;
       opacity: 0.95;
+      touch-action: manipulation;
     }
 
     @media (max-width:480px) {
       .moon { width: 70px; height: 70px; top: 10px; right: 10px; }
       #wish-popup { font-size: 0.85rem; padding: 12px 10px; }
+      .lantern { width: 30px; } /* Giảm kích thước đèn trên mobile */
+    }
+
+    /* Giảm hiệu ứng trên mobile để mượt hơn */
+    @media (max-width: 768px) {
+      canvas#starfield { transform: translateZ(0); } /* Hardware acceleration */
     }
   </style>
 </head>
@@ -139,7 +152,7 @@
     <div id="wish-popup"></div>
     <div id="hint">Chạm màn hình để mở nhạc và thả đèn ✨</div>
     <div class="controls">
-      <span class="music-toggle" id="musicToggle"></span>
+      <span class="music-toggle" id="musicToggle">🔈</span>
     </div>
   </div>
 
@@ -150,14 +163,15 @@
   <script>
     // ========== Sao & Sao băng ==========
     const canvas = document.getElementById('starfield');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: true }); // Bật alpha để tối ưu
     let w, h, stars = [], meteors = [];
+    let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
     function resizeCanvas() {
       w = canvas.width = innerWidth;
       h = canvas.height = innerHeight;
       stars = [];
-      const count = Math.round((w * h) / 5000); // giảm số lượng sao cho nhẹ
+      const count = isMobile ? Math.round((w * h) / 8000) : Math.round((w * h) / 5000); // Giảm sao trên mobile
       for (let i = 0; i < count; i++) {
         stars.push({
           x: Math.random() * w,
@@ -184,9 +198,10 @@
     }
 
     function createMeteor() {
+      if (isMobile && meteors.length > 2) return; // Giới hạn sao băng trên mobile
       const startX = Math.random() * w;
       const startY = Math.random() * (h / 3);
-      const speed = Math.random() * 6 + 4;
+      const speed = isMobile ? Math.random() * 4 + 2 : Math.random() * 6 + 4; // Giảm tốc độ trên mobile
       meteors.push({
         x: startX, y: startY,
         vx: speed + 4, vy: speed / 2,
@@ -216,7 +231,7 @@
     function loop() {
       drawStars();
       drawMeteors();
-      if (meteors.length < 5 && Math.random() < 0.006) createMeteor();
+      if (meteors.length < (isMobile ? 2 : 5) && Math.random() < (isMobile ? 0.003 : 0.006)) createMeteor();
       requestAnimationFrame(loop);
     }
 
@@ -229,14 +244,16 @@
     const wishes = [
       "Anh chúc em một mùa trăng an lành, ấm áp 🌕",
       "Có em cạnh bên thì ngày nào cũng là ngày đặc biệt ✨",
+      "Chúc em hay ăn chóng lớn nhé^^"
       "Mong mọi ước mơ của em đều thành sự thật 💫"
     ];
 
     function createLantern() {
-      if (lanternContainer.childElementCount >= 25) return; // giới hạn số lượng
+      if (lanternContainer.childElementCount >= (isMobile ? 10 : 25)) return; // Giảm giới hạn trên mobile
       const lantern = document.createElement("img");
-      lantern.src = "https://github.com/Panbap/Trungthu/blob/main/den.png?raw=true";
+      lantern.src = "https://raw.githubusercontent.com/Panbap/Trungthu/main/den.png"; // Sử dụng raw.githubusercontent.com cho nhanh hơn
       lantern.className = "lantern swing";
+      lantern.loading = "lazy"; // Lazy load hình ảnh
 
       const layer = Math.floor(Math.random() * 3) + 1;
       let size = 40, duration = 10000, opacity = 0.8;
@@ -244,6 +261,8 @@
       if (layer === 1) { size = 20 + Math.random() * 20; duration = 14000; opacity = 0.5; }
       else if (layer === 2) { size = 30 + Math.random() * 30; duration = 12000; opacity = 0.7; }
       else { size = 40 + Math.random() * 30; duration = 10000; opacity = 0.9; }
+
+      if (isMobile) { size *= 0.8; duration *= 1.2; } // Điều chỉnh trên mobile
 
       lantern.style.width = size + "px";
       lantern.style.left = Math.random() * 90 + "vw";
@@ -266,19 +285,23 @@
         const wishPopup = document.getElementById('wish-popup');
         wishPopup.textContent = wishes[Math.floor(Math.random() * wishes.length)];
         wishPopup.style.display = 'block';
-      });
+      }, { passive: true }); // Passive listener cho perf
     }
 
-    // thay setInterval bằng loop đồng bộ
+    // Throttle lantern creation cho mượt trên mobile
     let lastLantern = 0;
+    let rafId;
     function lanternLoop(ts) {
-      if (ts - lastLantern > 1200) {
+      if (ts - lastLantern > (isMobile ? 2000 : 1200)) { // Tăng khoảng cách trên mobile
         createLantern();
         lastLantern = ts;
       }
-      requestAnimationFrame(lanternLoop);
+      rafId = requestAnimationFrame(lanternLoop);
     }
-    requestAnimationFrame(lanternLoop);
+    lanternLoop(0); // Bắt đầu loop
+
+    // Dọn dẹp RAF khi unload
+    window.addEventListener('beforeunload', () => cancelAnimationFrame(rafId));
 
     // ========== Âm nhạc ==========
     const bg = document.getElementById('bg-music');
@@ -292,7 +315,7 @@
         let v = 0;
         const i = setInterval(() => {
           v += 0.05;
-          if (v >= 0.8) { v = 0.8; clearInterval(i); }
+          if (v >= (isMobile ? 0.5 : 0.8)) { v = isMobile ? 0.5 : 0.8; clearInterval(i); } // Giảm volume trên mobile
           bg.volume = v;
         }, 120);
         musicStarted = true;
@@ -308,23 +331,25 @@
       if (!musicStarted) { startMusic(); return; }
       if (bg.paused) { bg.play(); musicToggle.textContent = '🔊'; }
       else { bg.pause(); musicToggle.textContent = '🔈'; }
-    });
+    }, { passive: true });
 
     document.addEventListener('pointerdown', function onceStart() {
       startMusic();
-      document.removeEventListener('pointerdown', onceStart);
-    });
+      document.removeEventListener('pointerdown', onceStart, { passive: true });
+    }, { passive: true, once: true }); // Once và passive cho perf
 
     // click ra ngoài để tắt popup
     document.addEventListener('click', (e) => {
       const pop = document.getElementById('wish-popup');
-      if (pop && pop.style.display === 'block') {
+      if (pop && pop.style.display === 'block' && !pop.contains(e.target)) {
         pop.style.display = 'none';
       }
-    });
+    }, { passive: true });
 
-    // tạo vài đèn ban đầu
-    for (let i = 0; i < 3; i++) { setTimeout(createLantern, i * 800); }
+    // Tạo vài đèn ban đầu với delay lớn hơn trên mobile
+    for (let i = 0; i < (isMobile ? 1 : 3); i++) { 
+      setTimeout(createLantern, i * (isMobile ? 1500 : 800)); 
+    }
   </script>
 </body>
 </html>
